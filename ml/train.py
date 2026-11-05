@@ -2,6 +2,9 @@
 
 from pathlib import Path
 
+import joblib
+
+
 import numpy as np
 from sklearn.neural_network import MLPRegressor
 from sklearn.preprocessing import StandardScaler
@@ -40,7 +43,7 @@ X_test = scaler.transform(X[~is_train])
 # fit
 model = MLPRegressor(
     hidden_layer_sizes=(128, 64),
-    alpha=1e-4,
+    alpha=1e-1,
     max_iter=500,
     early_stopping=True,
     random_state=0,
@@ -49,6 +52,27 @@ model = MLPRegressor(
 model.fit(X_train, y[is_train])
 print(f"\ntrain r2: {model.score(X_train, y[is_train]):.4f}")
 print(f"test  r2: {model.score(X_test, y[~is_train]):.4f}")
+
+# training vs testing error, same measure on both
+mse_train = np.mean((model.predict(X_train) - y[is_train]) ** 2)
+mse_test = np.mean((model.predict(X_test) - y[~is_train]) ** 2)
+print(f"\ntrain mse: {mse_train:.6f}")
+print(f"test  mse: {mse_test:.6f}")
+
+print(f"test  r2: {model.score(X_test, y[~is_train]):.4f}")
+
+# training vs testing error, same measure on both
+mse_train = ...
+mse_test = ...
+print(f"\ntrain mse: {mse_train:.6f}")
+print(f"test  mse: {mse_test:.6f}")
+
+# save the model AND the scaler
+joblib.dump({"model": model, "scaler": scaler}, DATA_DIR / "model.joblib")
+print(f"saved model to {DATA_DIR / 'model.joblib'}")
+
+# predict
+pred = model.predict(X_test)
 
 # predict
 pred = model.predict(X_test)

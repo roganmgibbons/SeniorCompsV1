@@ -137,7 +137,7 @@ if __name__ == "__main__":
     # rows but four times as many distinct answers to learn from
     print("generating normal markets...")
     report_and_save(
-        generate(n_markets=20_000, samples_per_market=3, seed=0, label="normal"),
+        generate(n_markets=60000, samples_per_market=3, seed=0, label="normal"),
         "train.npz",
     )
 
