@@ -179,3 +179,84 @@ Regularization sweep at 100k markets (hidden=(128,64))
   wandered (validation stuck ~0.006 for the first 12 iterations) and early stopping ended at a worse
   spot. Tentative (single run): too little regularization -> overfits AND optimizes less reliably.
 - Winner at 100k: alpha=1e-1 (same as at 20k). Loss curve: 3.39% / 3.44% / 3.71% for 1e-1 / 1e-2 / 1e-3.
+
+Final 1e-1 rerun at 100k: identical to first run (model=3.39%), training is repeatable (random_state=0).
+data/model_100k.joblib = alpha 1e-1, hidden (128,64), 100k markets.
+
+### First real-data results (real/backtest.py, model_100k)
+Setup: 25 stocks, monthly returns Jan 1992 - Oct 2026 (418 months; Nov 2026 dropped as partial).
+Rolling: 120-month lookback, re-chosen monthly, held one month. 298 decisions, Jan 2002 - Oct 2026.
+Familiarity check: 0.6% of real scaled features outside |z| > 3 -> real inputs look like training data.
+
+| Strategy | Return/yr | Vol/yr | Sharpe | CE/yr | Worst drop | Turnover | Leverage |
+|---|---|---|---|---|---|---|---|
+| model       |  9.17% | 15.16% |  0.61 |   5.73% |  -47.2% | 0.17 |  1.55 |
+| even split  | 13.73% | 15.22% |  0.90 |  10.26% |  -44.6% | 0.00 |  1.00 |
+| markowitz   | -3.54% | 75.48% | -0.05 | -88.99% | -100.0% | 2.32 | 14.47 |
+| ledoit-wolf |  1.66% | 54.99% |  0.03 | -43.69% |  -98.1% | 1.49 |  9.68 |
+(Sharpe = return/vol, no risk-free rate. CE uses gamma=3, same score as the simulation.)
+Chart: figures/real_backtest.png ($1 -> ~$7 model, ~$22 even split; Markowitz bust 2009).
+
+Findings
+1. Model survives where the formulas crash: Markowitz bust (-100%, 14.5x leverage), Ledoit-Wolf
+   -98%. Model -47% worst drop, 1.55x leverage, low turnover, same volatility as even split.
+   Ledoit-Wolf fixes the covariance but still uses noisy sample means -> blows up (Merton again).
+2. Model loses to even split (Sharpe 0.61 vs 0.90, CE 5.7% vs 10.3%) at the same volatility.
+   Matches DeMiguel, Garlappi & Uppal (2009), "Optimal Versus Naive Diversification": no optimizer
+   reliably beats 1/N out of sample. Cite it.
+Likely reasons even split wins
+- Survivorship bias favors 1/N: all 25 stocks survived to 2026; shorting known survivors loses money
+  (model currently shorts DIS, CVX, T, PG, PFE, IBM, BA).
+- Real expected returns across large caps may be more similar than the simulation's beta*6% + alpha.
+- Model learned from an oracle that uses ~2x leverage, so tilting/shorting looks normal to it.
+- Inputs are familiar (0.6% outside range), so the gap is in how the real world rewards the weights.
+Rubric: Goal 4 -> Passing (runs on real data, compared to even split). Good needs beating 1/N on Sharpe.
+Known simplification: even split turnover shown as 0 (ignores drift between rebalances).
+
+Next experiments suggested by these results
+1. Long-only versions of every strategy, including the model (Tier 3 item 8): removes shorting of
+   survivors and the blow-ups.
+2. Minimum-variance baseline (ignores means; often strong on Sharpe in the literature).
+3. Crisis windows (2008, 2020) as a separate real-data stress test.
+4. S&P 500 (SPY) as a real-world reference line.
+
+### Real-data micro-experiments (real/experiments.py, model_100k)
+Full output: real/results/experiments_results_2026-11-05.txt. Run: `python -m real.experiments`
+New strategies: min-variance (Ledoit-Wolf covariance, ignores means) and long-only (LO) versions:
+model LO = model weights with shorts dropped and rescaled; markowitz LO / ledoit-wolf LO / min-variance LO
+solved with no shorting (scipy SLSQP, weights >= 0, sum to 1).
+
+EXP 1-2: 10-year lookback, Jan 2002 - Oct 2026
+| Strategy | Return | Vol | Sharpe | CE | Worst drop | $1 -> | Leverage |
+|---|---|---|---|---|---|---|---|
+| model           |  9.17% | 15.16% |  0.61 |   5.73% |  -47.2% |  7.27 |  1.55 |
+| markowitz       | -3.54% | 75.48% | -0.05 | -88.99% | -100.0% |  0.00 | 14.47 |
+| ledoit-wolf     |  1.66% | 54.99% |  0.03 | -43.69% |  -98.1% |  0.02 |  9.68 |
+| min-variance    | 10.02% | 12.87% |  0.78 |   7.54% |  -33.0% |  9.71 |  1.41 |
+| model LO        | 11.08% | 14.14% |  0.78 |   8.08% |  -47.0% | 12.08 |  1.00 |
+| markowitz LO    | 15.72% | 20.75% |  0.76 |   9.27% |  -51.0% | 28.42 |  1.00 |
+| ledoit-wolf LO  | 16.53% | 21.33% |  0.77 |   9.70% |  -51.8% | 33.56 |  1.00 |
+| min-variance LO | 10.30% | 12.27% |  0.84 |   8.04% |  -34.1% | 10.60 |  1.00 |
+| even split      | 13.73% | 15.22% |  0.90 |  10.26% |  -44.6% | 22.33 |  1.00 |
+
+EXP 3: lookback (each covers a different period, so compare within a table)
+- 5-yr (1997-2026): model LO Sharpe 0.87 vs even 0.96; model (unconstrained) 0.61.
+- 20-yr (2012-2026): model LO Sharpe 1.06 / CE 11.5% vs even 1.14 / 13.1%; model 0.96 / 10.4%.
+
+EXP 4: periods (10-yr lookback), Sharpe for model LO vs even split
+- 2002-07: 0.72 vs 0.97 (min-variance LO 1.00 best)
+- 2008-09: -0.43 vs 0.01 (min-variance LO best worst drop -32%; even split best CE)
+- 2010-19: **1.26 vs 1.21** (model LO best Sharpe, lower vol 11.6% vs 12.5%, smaller drop -10.7% vs -13.6%)
+- 2020-26: 0.88 vs 0.96 (ledoit-wolf LO best: 1.03)
+
+Findings
+1. Banning shorts rescues the formulas: Markowitz/LW go from bust to Sharpe ~0.77 and the highest
+   raw growth ($1 -> $28-34 vs $22 for even split), but with ~21% volatility.
+2. Banning shorts helps the model too: Sharpe 0.61 -> 0.78, CE 5.7% -> 8.1%. Shorting survivors was
+   a big part of the gap (survivorship bias).
+3. Even split still wins overall on Sharpe and CE (DeMiguel et al. 2009), but not in every period:
+   model LO beat it on Sharpe in 2010-2019.
+4. More history helps the model most (20-yr lookback: model Sharpe 0.96 vs 0.61 at 10-yr).
+5. Min-variance LO = lowest volatility and smallest crashes throughout (good crisis behavior).
+Caveats: many comparisons -> risk of cherry-picking a winner; sub-periods are short (2008-09 is 24
+months) so their Sharpe ratios are noisy; turnover ignores drift; no trading costs; survivorship bias.
