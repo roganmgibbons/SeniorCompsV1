@@ -260,3 +260,154 @@ Findings
 5. Min-variance LO = lowest volatility and smallest crashes throughout (good crisis behavior).
 Caveats: many comparisons -> risk of cherry-picking a winner; sub-periods are short (2008-09 is 24
 months) so their Sharpe ratios are noisy; turnover ignores drift; no trading costs; survivorship bias.
+
+### Fri Nov 6, 2026: meeting with professor (last weekly meeting)
+- Whiteboard exercise: explained every step of the pipeline in detail. Main feedback:
+  1. Quantify every step of the project (numbers, not descriptions).
+  2. Refine how the whole pipeline is explained.
+  3. "Explain the variance in the generated markets": any measurable randomness should be quantified.
+- Whiteboard flow chart corrections (for the poster version):
+  - Split "market simulation" into 100,000 markets -> 3 histories each = 300,000 histories.
+  - Features = 351 numbers (25 avg returns, 25 vols, 300 correlations, # months), not just returns/time.
+  - Oracle info has two arrows: -> answer key (MLP training target) and -> grading (CE loss).
+  - Add the train/test split by market: 80k/20k markets = 240k/60k rows.
+  - "Improved Markowitz" = Ledoit-Wolf (+ long-only, min-variance).
+  - Add final scoring step (CE in simulation; Sharpe/drawdown on real data) and the real-data branch
+    (real prices -> monthly returns -> same 351 features -> trained MLP).
+
+### Plan: Sun Nov 8 - Tue Nov 10 presentation
+Three layers of randomness to quantify:
+1. Between markets: distributions of generated betas, vols, alphas, market vol; resulting avg
+   correlation, oracle leverage, oracle CE. Compare against the 25 real stocks (real betas, vols,
+   correlations) -> are the fake markets realistic?
+2. Within a market: how far sample means / vols / correlations land from the truth at 5 vs 50 years
+   (quantifies estimation error directly).
+3. In results: retrain with 5 seeds -> error bars on 3.39% and on the real-data Sharpe ratios.
+Then: slides for Tuesday (pipeline, quantified; experiments; results), poster planning.
+- Professor's note (verbatim): "Test randomness and variance of portfolios -> Variance of MLP portfolio performance."
+  Interpretation: report the SPREAD of the model's performance, not just the average:
+  a) across test markets: p10/median/p90 of CE loss + % of markets where model beats even split
+     (train.py already computes per-market losses)
+  b) across training runs: 5 seeds -> 3.39% +/- X
+  c) across real portfolios and time: random 25-stock portfolios from the pool; confidence
+     intervals on real-data Sharpe ratios
+
+### Mon Nov 9, 2026: presentation prep + variance of model performance
+- Added to train.py (after the strategy table): spread of the model's CE loss across the 60,000
+  test histories + win rate vs even split.
+- Result (100k markets, alpha 1e-1):
+  - p10 1.79% / median 3.12% / p90 5.34% per year (mean 3.39%: a minority of hard cases pulls it up)
+  - Model beats even split in 86.7% of test histories -> consistent, not driven by a few wins.
+  - Spread is mostly market difficulty (more extreme oracle portfolio -> more loss for every strategy).
+- Still to do for "variance": exp04_market_variance output (spread of fake markets), 5-seed error
+  bars, random real portfolios.
+- New figure: figures/pipeline_detailed.png (clean redraw of the whiteboard flow chart, for slide 3
+  and the poster).
+- Presentation 5 outline: 1 title, 2 question/foundation/goals, 3 detailed pipeline diagram,
+  4 what I did (model + real stocks + quantifying randomness), 5+ results, rubric, next steps.
+
+Variance BETWEEN fake markets (experiments/exp04.py, 100,000 markets, after the leverage filter)
+| Measure | p0 | p10 | p50 | p90 | p100 | mean |
+|---|---|---|---|---|---|---|
+| stock volatility (annual)   |   8.3% | 29.2% | 41.6% | 54.4% | 86.8% | 41.7% |
+| stock expected return       | -10.4% |  1.4% |  6.0% | 10.7% | 24.4% |  6.0% |
+| avg correlation in a market |   0.03 |  0.10 |  0.23 |  0.40 |  0.69 |  0.24 |
+| perfect portfolio leverage  |   1.01 |  1.45 |  2.09 |  3.40 |  4.00 |  2.26 |
+| best possible CE (annual)   |  -7.2% | -0.0% |  3.8% |  7.6% | 16.5% |  3.8% |
+- This answers the professor's question ("how different are the generated markets"): wide range of
+  conditions (correlation 0.10-0.40, leverage 1.45-3.40 for the middle 80%), not one world.
+- ~10% of markets: even the perfect portfolio has CE <= 0 (risk outweighs reward; weights must sum
+  to 1 so it can't sit in cash).
+- Realism flag: fake stocks are more volatile (median 42%/yr) than real large caps (~15-30%).
+  Correlation (median 0.23) looks realistic. Possible reason for the real-data gap.
+  Next: compute the same table for the 25 real stocks and compare side by side.
+
+Real vs fake markets (real = 25 stocks, monthly, Yahoo Finance via yfinance, Jan 1992 - Oct 2026)
+| | Real 25 stocks | Fake markets |
+|---|---|---|
+| Stock volatility, median | 27.6%/yr (2002-26 only: 24.9%) | 41.6% |
+| Stock volatility, range  | 18.3% (JNJ) - 49.4% (QCOM)     | 8.3% - 86.8% |
+| Avg pairwise correlation | 0.25 (2002-26: 0.29)           | 0.24 (median 0.23) |
+- Fake stocks ~1.5x more volatile than real large caps; correlation realistic.
+- Likely cause of the high fake volatility: the leverage filter rejects markets with similar
+  (low idiosyncratic vol) stocks, so kept markets skew toward high volatility.
+- Implied scores in simulation (approx; best CE avg over all markets, losses over test markets):
+  perfect ~3.8%/yr, model ~0.4%, even split ~-1.3%, Markowitz ~-38%.
+
+## Citations (verify volume/pages on Google Scholar before the paper)
+1. Markowitz, H. (1952). Portfolio Selection. Journal of Finance, 7(1), 77-91.
+2. Merton, R. C. (1980). On Estimating the Expected Return on the Market. Journal of Financial Economics, 8(4), 323-361.
+3. Jorion, P. (1986). Bayes-Stein Estimation for Portfolio Analysis. Journal of Financial and Quantitative Analysis, 21(3), 279-292.
+4. Campbell, J. Y., Lettau, M., Malkiel, B. G., & Xu, Y. (2001). Have Individual Stocks Become More Volatile? An Empirical Exploration of Idiosyncratic Risk. Journal of Finance, 56(1), 1-43. (verified)
+5. Ledoit, O., & Wolf, M. (2004). A Well-Conditioned Estimator for Large-Dimensional Covariance Matrices. Journal of Multivariate Analysis, 88(2), 365-411. (method used by sklearn LedoitWolf; alt: "Honey, I Shrunk the Sample Covariance Matrix", J. Portfolio Management 2004)
+6. DeMiguel, V., Garlappi, L., & Uppal, R. (2009). Optimal Versus Naive Diversification: How Inefficient Is the 1/N Portfolio Strategy? Review of Financial Studies, 22(5), 1915-1953.
+7. Zhang, Z., Zohren, S., & Roberts, S. (2020). Deep Learning for Portfolio Optimization. Journal of Financial Data Science, 2(4), 8-20.
+8. NYU Stern Volatility Lab, S&P 500 volatility (GARCH): https://vlab.stern.nyu.edu/volatility/VOL.SPX%3AIND-R.GARCH
+9. Yahoo Finance monthly adjusted prices via the yfinance Python library (1990-2026).
+
+### Parameter variance (professor's request), experiments/exp05.py
+Code changes: factor_model_known(..., return_params=True) returns beta, idio_vol, alpha (annual);
+dataset.py saves param_* (kept markets) and draw_* (every draw, kept or rejected) + draw_kept into
+train.npz. Random draw order unchanged -> data reproduced exactly (74,894 rejected draws, same as
+before), so model_100k.joblib and all results stay valid.
+Problems hit: old report_and_save left below the new one (Python uses the LAST definition) ->
+"too many values to unpack"; exp05 run before train.npz finished saving -> "File is not a zip file".
+
+174,894 draws, 100,000 kept (57.2%), 74,894 rejected by the leverage filter.
+| Parameter | | mean | sd | variance | p10 | p50 | p90 |
+|---|---|---|---|---|---|---|---|
+| market volatility (per market)        | all  | 20.0% | 5.8%  | 0.0033 | 12.0% | 20.0% | 28.0% |
+|                                       | kept | 19.9% | 5.8%  | 0.0033 | 12.0% | 19.9% | 27.9% |
+| typical stock-specific vol (per mkt)  | all  | 28.5% | 9.5%  | 0.0091 | 15.3% | 28.5% | 41.7% |
+|                                       | kept | 35.3% | 5.8%  | 0.0034 | 27.4% | 35.6% | 43.1% |
+| beta (per stock)                      | all  | 1.00  | 0.35  | 0.1200 | 0.55  | 1.00  | 1.45  |
+|                                       | kept | 1.00  | 0.35  | 0.1200 | 0.55  | 1.00  | 1.45  |
+| stock-specific volatility (per stock) | all  | 28.7% | 12.0% | 0.0144 | 12.2% | 28.5% | 44.8% |
+|                                       | kept | 35.5% | 9.7%  | 0.0093 | 22.9% | 35.5% | 48.0% |
+| alpha (per stock)                     | all  | 0.0%  | 3.0%  | 0.0009 | -3.8% | 0.0%  | 3.8%  |
+|                                       | kept | 0.0%  | 3.0%  | 0.0009 | -3.8% | 0.0%  | 3.8%  |
+Total stock volatility: all mean 36.4% (p10 21.6 / p50 36.3 / p90 51.3); kept mean 41.7% (29.2 / 41.6 / 54.4).
+
+Findings
+- Generator matches its design exactly (uniform 10-30 -> mean 20 sd 5.8; uniform 12-45 -> mean 28.5
+  sd 9.5; beta 1.00/0.35; alpha 0/3%).
+- The leverage filter only reshapes stock-specific volatility: it removes nearly all low-idio markets
+  (p10 15.3% -> 27.4%), because then stocks are near-copies of the market and the oracle needs huge
+  long/short bets (>4x). Market vol, beta, alpha unaffected.
+- Realism gap explained: total vol median 36% from the rules alone, 42% after the filter, vs 28% for
+  the 25 real stocks.
+- Possible fixes (later): lower idio range; long-only oracle (no leverage filter needed); then retest
+  real data.
+Next (piece 4): estimate real betas / idio vol / alphas by regressing the 25 real stocks on SPY
+(python -m real.download spy) and compare side by side.
+
+### Tue Nov 10, 2026: practice-run feedback (roommates) -> new experiments
+1. History depth: 3 -> 10 histories per market.
+   - Version A (do this): same total rows. 30,000 markets x 10 histories = 300,000 rows vs current
+     100,000 x 3. Isolates "many markets vs same markets many times". ~5 min, same file size.
+     Prediction: 3 histories wins (more distinct answer keys).
+   - Version B (later, overnight): 100,000 x 10 = 1M rows; ~8 GB peak memory -> use float32.
+2. Portfolio size: 25 vs 30 vs 35 stocks.
+   - Input size = 2N + N(N-1)/2 + 1 -> 351 / 496 / 666 features; each N needs its own dataset + model.
+   - N_ASSETS hard-coded in dataset.py, train.py, real scripts -> make it a setting.
+   - Real data: draw 30/35 stocks from the pool universe (python -m real.download pool).
+   - Theory: estimation error grows with N for fixed history -> Markowitz should degrade; does the
+     model degrade less?
+Order after presentation: real-parameter comparison (piece 4) -> history depth A -> portfolio sizes
+-> 5-seed error bars.
+
+Deck fixes noted for Presentation 5: add rubric slide (required Q3); slide 4 MSE wording is
+train vs test (0.0125 vs 0.0127), not a change over time; use fixed real_model_vs_even.png.
+
+### Thu Nov 12, 2026: metrics decision + glossary (post-presentation feedback)
+Headline metrics (one per thesis question):
+1. CE loss (simulation): exact Markowitz objective vs a known answer -> cost of estimation error.
+2. Sharpe ratio (real data): standard risk-adjusted score, comparable to DeMiguel et al.
+3. Max drawdown (real data): what a personal investor feels; tests the crisis goal.
+Supporting: win rate vs even split (87%), gap closed toward Bayes floor (~70%, approximate floor),
+$1 grows to (communication), volatility / turnover / leverage (explain the headline numbers).
+Diagnostics only: R2, MSE (weight accuracy, not money; disagreed with CE once).
+Paper sentence: "I evaluate strategies by certainty-equivalent loss in simulation, where the optimal
+portfolio is known, and by Sharpe ratio and maximum drawdown on real data, where it is not."
+Glossary saved as GLOSSARY.md (finance + ML; starred terms for the poster box).
+Not yet committed: Nov 9 changes (param saving, exp04, exp05, win rate).

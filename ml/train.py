@@ -164,6 +164,14 @@ print(f"\nSUMMARY  markets={n_markets:,}  alpha={ALPHA}  hidden={HIDDEN}  "
       f"markowitz={losses['markowitz'].mean() * 12:.2%}")
 
 
+# how much does the model's performance vary from one test history to the next?
+model_loss = losses["model"] * 12            # per year, one value per test history
+gap = losses["even split"] - losses["model"] # positive = model gave up less than even split
+
+print(f"\nspread of the model's loss across {len(model_loss):,} test histories:")
+for q in [10, 50, 90]:
+    print(f"  p{q}: {np.percentile(model_loss, q):.2%} per year")
+print(f"  model beats even split in {(gap > 0).mean():.1%} of test histories")
 # ---------------------------------------------------------------- plot
 # bin by how extreme the perfect portfolio is, average the loss in each bin
 bins = np.array([1, 2, 3, 4, 6, 8, 12, 20, 1000])

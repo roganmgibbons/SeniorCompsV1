@@ -21,7 +21,8 @@ from src.config import PERIODS_PER_YEAR
 def factor_model_known(n_assets, seed,
                        annual_premium = 0.06,
                        market_vol_annual = 0.16,
-                       idio_vol_annual = 0.22):
+                       idio_vol_annual = 0.22,
+                       return_params = False):
 
     rng = np.random.default_rng(seed)
     # 1. betas - each asset's market exposure
@@ -39,15 +40,21 @@ def factor_model_known(n_assets, seed,
     # 4. assemble - same np.outer trick as make_truth
     Sigma = market_var * np.outer(betas, betas) + np.diag(idio_var)
 
-    # 5. expected returns: paid for market exposure, plus noise
-    mu = betas * (annual_premium / PERIODS_PER_YEAR)
-    mu = mu + rng.normal(0, 0.03 / PERIODS_PER_YEAR, size=n_assets)
+    # 5. expected returns: paid for market exposure, plus noise (the hidden bonus, alpha)
+    # same random draws in the same order as before, so old data is reproduced exactly
+    alpha = rng.normal(0, 0.03 / PERIODS_PER_YEAR, size=n_assets)
+    mu = betas * (annual_premium / PERIODS_PER_YEAR) + alpha
 
     # 6. kill floating-point asymmetry
     Sigma = 0.5 * (Sigma + Sigma.T)
 
+    # optionally hand back the ingredients, so they can be saved and measured
+    if return_params:
+        params = {"beta": betas,
+                  "idio_vol": idio_vol_ann,                 # annual
+                  "alpha": alpha * PERIODS_PER_YEAR}        # annual
+        return mu, Sigma, params
     return mu, Sigma
-
 
 
 

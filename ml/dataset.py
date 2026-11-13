@@ -48,6 +48,11 @@ def generate(n_markets, samples_per_market, seed,
     market_mu, market_Sigma, w_markowitz = [], [], []
     rejected = 0
 
+    # every parameter of every KEPT market, so it can be measured later
+    kept = {"market_vol": [], "idio_level": [], "beta": [], "idio_vol": [], "alpha": []}
+    # every parameter of EVERY draw (kept or rejected), to measure what the filter does
+    draws = {"market_vol": [], "idio_level": [], "beta": [], "idio_vol": [], "alpha": [], "kept": []}
+
     for m in range(n_markets):
 
         # some parameter combinations make the 25 assets near duplicates of
@@ -59,15 +64,24 @@ def generate(n_markets, samples_per_market, seed,
             market_vol = rng.uniform(*market_vol_range)
             idio_vol = rng.uniform(*idio_vol_range)
 
-            mu, Sigma = factor_model_known(
+            mu, Sigma, params = factor_model_known(
                 n_assets=N_ASSETS,
-                seed=int(rng.integers(2 ** 32)),
+                seed=int(rng.integers(2**32)),
                 market_vol_annual=market_vol,
                 idio_vol_annual=idio_vol,
+                return_params=True,
             )
             w_star = oracle_weights(mu, Sigma)
+            ok = np.abs(w_star).sum() <= max_oracle_leverage
 
-            if np.abs(w_star).sum() <= max_oracle_leverage:
+            # record this draw whether or not it survives the filter
+            draws["market_vol"].append(market_vol)
+            draws["idio_level"].append(idio_vol)
+            for k in ("beta", "idio_vol", "alpha"):
+                draws[k].append(params[k])
+            draws["kept"].append(ok)
+
+            if ok:
                 break
 
             rejected += 1
@@ -79,12 +93,18 @@ def generate(n_markets, samples_per_market, seed,
         market_mu.append(mu)
         market_Sigma.append(Sigma)
 
+        # keep the parameters of the market that survived
+        kept["market_vol"].append(market_vol)
+        kept["idio_level"].append(idio_vol)
+        for k in ("beta", "idio_vol", "alpha"):
+            kept[k].append(params[k])
+
         for s in range(samples_per_market):
 
             # vary how much history the sample contains, 5 to 50 years
             n_months = int(rng.integers(60, 601))
 
-            draw_rng = np.random.default_rng(int(rng.integers(2 ** 32)))
+            draw_rng = np.random.default_rng(int(rng.integers(2**32)))
             R = draw_returns(mu, Sigma, n_months, draw_rng)
 
             X.append(make_features(R))
@@ -97,7 +117,7 @@ def generate(n_markets, samples_per_market, seed,
         if (m + 1) % 2000 == 0:
             print(f"  {label}: {m + 1} / {n_markets}")
 
-    print(f"  {label}: rejected {rejected} markets for excess oracle leverage")
+    print(f"  {label}: rejected {rejected} draws for excess oracle leverage")
 
     return (
         np.array(X),
@@ -106,11 +126,13 @@ def generate(n_markets, samples_per_market, seed,
         np.array(market_mu),
         np.array(market_Sigma),
         np.array(w_markowitz),
+        {k: np.array(v) for k, v in kept.items()},
+        {k: np.array(v) for k, v in draws.items()},
     )
 
 
 def report_and_save(out, filename):
-    X, y, market_id, market_mu, market_Sigma, w_mk = out
+    X, y, market_id, market_mu, market_Sigma, w_mk, kept, draws = out
     gross = np.abs(y).sum(axis=1)
 
     print(f"\n  X: {X.shape}   y: {y.shape}   markets: {market_id.max() + 1}")
@@ -125,9 +147,12 @@ def report_and_save(out, filename):
         market_mu=market_mu,
         market_Sigma=market_Sigma,
         w_markowitz=w_mk,
+        # parameters of the kept markets, e.g. param_beta has shape (n_markets, 25)
+        **{f"param_{k}": v for k, v in kept.items()},
+        # parameters of every draw, kept or rejected, e.g. draw_beta has shape (n_draws, 25)
+        **{f"draw_{k}": v for k, v in draws.items()},
     )
     print(f"  saved to {DATA_DIR / filename}")
-
 
 if __name__ == "__main__":
     DATA_DIR.mkdir(exist_ok=True)
@@ -137,7 +162,7 @@ if __name__ == "__main__":
     # rows but four times as many distinct answers to learn from
     print("generating normal markets...")
     report_and_save(
-        generate(n_markets=60000, samples_per_market=3, seed=0, label="normal"),
+        generate(n_markets=100000, samples_per_market=3, seed=0, label="normal"),
         "train.npz",
     )
 
