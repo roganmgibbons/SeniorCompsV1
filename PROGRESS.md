@@ -411,3 +411,42 @@ Paper sentence: "I evaluate strategies by certainty-equivalent loss in simulatio
 portfolio is known, and by Sharpe ratio and maximum drawdown on real data, where it is not."
 Glossary saved as GLOSSARY.md (finance + ML; starred terms for the poster box).
 Not yet committed: Nov 9 changes (param saving, exp04, exp05, win rate).
+
+### Sun Nov 15, 2026: real vs fake parameters (real/real_params.py), finishes professor's request
+Setup: SPY downloaded (python -m real.download spy; data/real_prices_spy.csv, from Jan 1993).
+Each real stock regressed on SPY monthly returns, Feb 1993 - Oct 2026 (405 months):
+stock return = alpha + beta * market return + noise (np.polyfit). Fake = kept markets (param_*).
+Problem hit: ran real_params.py before downloading SPY -> FileNotFoundError.
+
+| Parameter | | mean | sd | p10 | p50 | p90 |
+|---|---|---|---|---|---|---|
+| beta                      | fake | 1.00  | 0.35 | 0.55  | 1.00  | 1.45  |
+|                           | real | 0.99  | 0.35 | 0.54  | 1.10  | 1.41  |
+| alpha (annual)            | fake | 0.0%  | 3.0% | -3.8% | 0.0%  | 3.8%  |
+|                           | real | 5.1%  | 3.9% | 1.3%  | 5.0%  | 9.4%  |
+| stock-specific volatility | fake | 35.5% | 9.7% | 22.9% | 35.5% | 48.0% |
+|                           | real | 24.8% | 7.2% | 17.6% | 22.4% | 35.9% |
+| total stock volatility    | fake | 41.7% | 9.7% | 29.2% | 41.6% | 54.4% |
+|                           | real | 28.9% | 8.3% | 19.5% | 27.3% | 40.3% |
+Market volatility: fake mean 19.9% (range 10-30%) vs real S&P 500 14.7%.
+Avg correlation: real 0.26 vs fake median 0.23.
+Per-stock real betas: PG 0.41 (lowest) ... INTC 1.47 (highest). Negative real alpha: DIS -3%, BAC -3%
+(23 of 25 positive). Highest alpha: AAPL +14%, QCOM +12%, VLO +10%.
+
+Findings
+1. Structure realistic: beta (1.00 vs 0.99, same spread and percentiles) and correlation (0.23 vs 0.26).
+2. Too volatile at every level: market +35% (19.9 vs 14.7), stock-specific +43% (35.5 vs 24.8),
+   total +44% (41.7 vs 28.9). Causes: design ranges (market vol 10-30%) + leverage filter (exp05).
+3. Real alphas average +5.1%: survivorship bias, now measured (chose companies that became giants).
+   Explains part of the real-data gap: the model shorted stocks with positive real alpha
+   (PG +7%, PFE +4%, CVX +5%, T +3%) because positive alpha doesn't exist on average in training.
+Caveat: each real alpha has standard error ~ 25%/sqrt(34 yrs) ~ +/-4%/yr, so the spread of real
+alphas (sd 3.9%) is about what noise alone gives (Merton 1980 on real data). The +5% average across
+25 stocks is too consistent to be noise.
+Note: regression uses raw returns (no risk-free rate), so low-beta stocks get a small upward alpha
+bias of about (1 - beta) x risk-free rate (~1%/yr at most). Minor vs +5%.
+
+Next experiment (poster candidate): recalibrate the fake market (market vol ~15%, lower
+stock-specific vol), retrain, rerun the real backtest; does the gap to even split shrink?
+Tradeoff: lower stock-specific vol -> leverage filter rejects more markets -> likely switch to a
+long-only oracle (never needs extreme leverage).
