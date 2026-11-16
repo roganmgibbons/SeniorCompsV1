@@ -28,7 +28,7 @@ def make_features(R):
     corr = S / np.outer(vols, vols)          # (25, 25)
 
     # upper triangle only, k=1 skips the diagonal since it is always 1
-    iu = np.triu_indices(N_ASSETS, k=1)
+    iu = np.triu_indices(R.shape[1], k=1)    # works for any number of stocks
     corr_flat = corr[iu]                     # (300,)
 
     n_months = R.shape[0]
@@ -40,6 +40,7 @@ def generate(n_markets, samples_per_market, seed,
              market_vol_range=(0.10, 0.30),
              idio_vol_range=(0.12, 0.45),
              max_oracle_leverage=4.0,
+             n_assets=N_ASSETS,
              label="markets"):
 
     rng = np.random.default_rng(seed)
@@ -65,7 +66,7 @@ def generate(n_markets, samples_per_market, seed,
             idio_vol = rng.uniform(*idio_vol_range)
 
             mu, Sigma, params = factor_model_known(
-                n_assets=N_ASSETS,
+                n_assets=n_assets,
                 seed=int(rng.integers(2**32)),
                 market_vol_annual=market_vol,
                 idio_vol_annual=idio_vol,
@@ -155,27 +156,36 @@ def report_and_save(out, filename):
     print(f"  saved to {DATA_DIR / filename}")
 
 if __name__ == "__main__":
-    DATA_DIR.mkdir(exist_ok=True)
+    import argparse
 
-    # normal markets
-    # 20,000 markets with 3 samples each beats 5,000 with 10, same number of
-    # rows but four times as many distinct answers to learn from
-    print("generating normal markets...")
+    p = argparse.ArgumentParser()
+    p.add_argument("--markets", type=int, default=100_000)
+    p.add_argument("--histories", type=int, default=3)
+    p.add_argument("--assets", type=int, default=N_ASSETS)
+    p.add_argument("--market-vol", type=float, nargs=2, default=[0.10, 0.30])
+    p.add_argument("--idio-vol", type=float, nargs=2, default=[0.12, 0.45])
+    p.add_argument("--out", default="train.npz")
+    p.add_argument("--no-crisis", action="store_true", help="skip the crisis set")
+    a = p.parse_args()
+
+    DATA_DIR.mkdir(exist_ok=True)
+    print(f"generating {a.markets:,} markets x {a.histories} histories, {a.assets} stocks, "
+          f"market vol {a.market_vol}, stock-specific vol {a.idio_vol} -> {a.out}")
     report_and_save(
-        generate(n_markets=100000, samples_per_market=3, seed=0, label="normal"),
-        "train.npz",
+        generate(n_markets=a.markets, samples_per_market=a.histories, seed=0,
+                 market_vol_range=tuple(a.market_vol), idio_vol_range=tuple(a.idio_vol),
+                 n_assets=a.assets, label="normal"),
+        a.out,
     )
 
     # crisis markets, never trained on
-    # high market volatility plus low idiosyncratic volatility means
-    # everything moves together, which is what a crisis looks like
-    # capped at 8x so the target stays something an investor could approximate
-    print("\ngenerating crisis markets...")
-    report_and_save(
-        generate(n_markets=2_000, samples_per_market=3, seed=999,
-                 market_vol_range=(0.25, 0.45),
-                 idio_vol_range=(0.08, 0.18),
-                 max_oracle_leverage=8.0,
-                 label="crisis"),
-        "stress.npz",
-    )
+    if not a.no_crisis:
+        print("\ngenerating crisis markets...")
+        report_and_save(
+            generate(n_markets=2_000, samples_per_market=3, seed=999,
+                     market_vol_range=(0.25, 0.45),
+                     idio_vol_range=(0.08, 0.18),
+                     max_oracle_leverage=8.0,
+                     n_assets=a.assets, label="crisis"),
+            "stress.npz" if a.out == "train.npz" else a.out.replace(".npz", "_stress.npz"),
+        )

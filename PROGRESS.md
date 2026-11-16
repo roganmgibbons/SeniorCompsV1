@@ -450,3 +450,87 @@ Next experiment (poster candidate): recalibrate the fake market (market vol ~15%
 stock-specific vol), retrain, rerun the real backtest; does the gap to even split shrink?
 Tradeoff: lower stock-specific vol -> leverage filter rejects more markets -> likely switch to a
 long-only oracle (never needs extreme leverage).
+
+### Plan: three robustness experiments (started Sun Nov 15)
+Rules: change one setting at a time (alpha=0.1, hidden=(128,64), seed fixed); every run saves to
+its own files (train_<tag>.npz, model_<tag>.joblib) so the 100k baseline is never overwritten.
+Code change: dataset.py and train.py take command-line settings (--markets, --histories, --assets,
+--market-vol, --idio-vol, --out, --no-crisis / --data, --tag, --alpha). Defaults reproduce the baseline.
+
+1. Volatility recalibration (most important)
+   baseline: market vol U(10%,30%), stock-specific U(12%,45%)
+   realistic: market vol U(10%,20%) (mean ~15% vs S&P 14.7%), stock-specific U(10%,30%)
+   python -m ml.dataset --market-vol 0.10 0.20 --idio-vol 0.10 0.30 --out train_lowvol.npz --no-crisis
+   python -m ml.train --data train_lowvol.npz --tag lowvol
+   Judge by: train vs test loss; model vs even split WITHIN each world (CE not comparable across
+   calibrations: calmer markets are easier for everyone); real-data backtest (same test for both).
+   Watch: rejected draws (filter rejects more calm markets) -> log it; may need long-only oracle.
+2. Histories per market: 3 vs 5 vs 10 at the SAME total rows (100k x 3, 60k x 5, 30k x 10 = 300k).
+3. Portfolio size: 25 vs 30 vs 35 stocks (351 / 496 / 666 features). Real data: add 1-2 stocks per
+   sector from the pool (e.g. 30: + TXN, PEP, WFC, ABT, SO; 35: + NEE, LOW, COP, AMGN, UNP) and make
+   backtest/experiments use the number of stocks from the data instead of 25.
+
+### Experiment 1 (volatility): data generation, Sun Nov 15
+Command: python -m ml.dataset --market-vol 0.10 0.20 --idio-vol 0.10 0.30 --out train_lowvol.npz --no-crisis
+Fixes before running: train.py rewritten with argparse (--data/--tag/--alpha), ROOT/DATA_DIR/FIG_DIR
+restored, model saved as model_<tag>.joblib (old MODEL_FILE line would have overwritten
+model_100k.joblib); dataset.py generate() got the n_assets parameter. Note: PyCharm overwrote the new
+train.py with its open buffer once -> reload from disk when PyCharm asks.
+| | Baseline | Low volatility |
+|---|---|---|
+| draws rejected by leverage filter | 74,894 / 174,894 (43%) | 374,026 / 474,026 (79%) |
+| perfect-portfolio leverage, median | 2.09 | 3.18 |
+- Calm markets -> stocks look alike -> oracle makes bigger long/short bets -> most break the 4x cap.
+  Survivors sit near the cap (median 3.18x): more extreme targets, harder to learn, less like real
+  investing. The filter likely keeps the upper end of the new vol ranges -> check with exp05 on this file.
+- Strengthens the case for a long-only oracle (no leverage, no filter).
+
+### Experiment 1 (volatility): training results, Sun Nov 15
+SUMMARY data=train_lowvol.npz tag=lowvol markets=100,000 stocks=25 alpha=0.1 hidden=(128,64) iters=39
+secs=22 r2 train/test=0.257/0.243 mse train/test=0.02401/0.02454 model=4.34% even=5.42%
+markowitz=41.24% win rate=82.2%  (loss spread p10/p50/p90: 2.72% / 4.19% / 6.12%)
+| | Baseline | Low vol |
+|---|---|---|
+| R2 train / test | 0.248 / 0.233 | 0.257 / 0.243 |
+| MSE train / test | 0.0125 / 0.0127 | 0.0240 / 0.0245 |
+| model loss/yr | 3.39% | 4.34% |
+| even split loss/yr | 5.08% | 5.42% |
+| model edge over even | 1.69 pts (33% less) | 1.08 pts (20% less) |
+| win rate vs even | 86.7% | 82.2% |
+| oracle leverage median | 2.09 | 3.19 |
+| leverage 0-2 bucket (model vs even) | 0.00204 vs 0.00287 | 0.00212 vs 0.00207 (921 rows: even wins) |
+Findings
+- No overfitting in either world.
+- Model's edge over even split shrinks in the calmer world; in the simplest markets even split wins.
+- MSE doubled only because targets are more extreme (bigger weights -> bigger squared errors):
+  MSE is not comparable across worlds (diagnostic, not headline). CE also not comparable across worlds.
+- The "calm" world is not calm in practice: the leverage filter (79% rejected) keeps the most extreme
+  oracles. The filter, not volatility, now dominates -> next: long-only oracle (no filter needed).
+Decisive test: python -m real.experiments --model model_lowvol.joblib (compare real Sharpe to baseline:
+model 0.61, model LO 0.78, even split 0.90).
+
+### Experiment 1 (volatility): real-data results, model_lowvol vs model_100k
+Command: python -m real.experiments --model model_lowvol.joblib (formula strategies identical to
+before -> sanity check passes; only the model changed).
+10-year lookback, Jan 2002 - Oct 2026:
+| | Original model | Low-vol model |
+|---|---|---|
+| model: Sharpe / CE / worst drop / $1 -> / leverage | 0.61 / 5.73% / -47.2% / 7.27 / 1.55 | 0.58 / 5.32% / -39.6% / 6.42 / 1.44 |
+| model LO: Sharpe / CE / worst drop / $1 -> | 0.78 / 8.08% / -47.0% / 12.08 | 0.74 / 7.46% / -41.0% / 10.33 |
+| even split | 0.90 / 10.26% / -44.6% / 22.33 | same |
+Lookback (model LO Sharpe; even split): 5-yr 0.87 -> 0.98 (even 0.96); 10-yr 0.78 -> 0.74 (0.90);
+20-yr 1.06 -> 0.96 (1.14).
+5-yr lookback, low-vol model LO vs even split: Sharpe 0.98 vs 0.96, CE 11.87% vs 11.54%,
+worst drop -40.1% vs -44.6%, $1 -> 73.56 vs 65.39  (first time a model version beats 1/N on all
+headline metrics; one comparison of many, one seed, small margin -> needs error bars).
+Periods (10-yr lookback, model LO Sharpe original -> low-vol): 2002-07 0.72 -> 0.73; 2008-09 -0.43 ->
+-0.37; 2010-19 1.26 -> 1.08; 2020-26 0.88 -> 0.85.
+Findings
+- Consistent gain: smaller crashes (worst drop -47% -> -40/-41%, better than even split's -45%).
+- Mixed Sharpe: slightly worse at 10/20-yr lookbacks, better at 5-yr.
+- Verdict: realistic volatility improved crash protection but did not clearly close the gap to 1/N;
+  the leverage filter (79% rejected, oracle leverage 3.2x) likely offset the calibration.
+Paper sentence: "Calibrating the simulator's volatility to real stocks reduced the model's worst
+drawdown on real data from -47% to -40%, but did not consistently improve its Sharpe ratio, because
+the leverage filter offset the calibration by retaining markets with more extreme optimal portfolios."
+Next: long-only oracle (removes the leverage filter), then error bars (5 seeds), histories, portfolio size.

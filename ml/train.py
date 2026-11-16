@@ -1,5 +1,9 @@
 # trains the model and compares it to the formula on markets it never saw
+#
+# usage:  python -m ml.train                                        (baseline: train.npz -> model_100k)
+#         python -m ml.train --data train_lowvol.npz --tag lowvol   (an experiment)
 
+import argparse
 import time
 from pathlib import Path
 
@@ -11,29 +15,36 @@ from sklearn.preprocessing import StandardScaler
 
 from src.metrics import ce_loss
 
-N_ASSETS = 25
 ROOT = Path(__file__).resolve().parents[1]
 DATA_DIR = ROOT / "data"
 FIG_DIR = ROOT / "figures"
 
-# settings, change these between runs
-ALPHA = 1e-1               # L2 penalty against memorizing (not the market's alpha)
+# settings, change these on the command line between runs
+p = argparse.ArgumentParser()
+p.add_argument("--data", default="train.npz", help="which data file in data/ to train on")
+p.add_argument("--tag", default=None, help="name for the saved model, e.g. lowvol")
+p.add_argument("--alpha", type=float, default=1e-1)
+args = p.parse_args()
+
+ALPHA = args.alpha         # L2 penalty against memorizing (not the market's alpha)
 HIDDEN = (128, 64)         # network size: two layers of 128 and 64 neurons
 
 
 # ---------------------------------------------------------------- load
-d = np.load(DATA_DIR / "train.npz")
+d = np.load(DATA_DIR / args.data)
 X, y = d["X"], d["y"]
 market_id = d["market_id"]
 market_mu, market_Sigma = d["market_mu"], d["market_Sigma"]
 w_markowitz = d["w_markowitz"]
 
 n_markets = market_id.max() + 1
-print(f"{X.shape[0]:,} examples from {n_markets:,} markets")
+N_ASSETS = y.shape[1]                                   # 25, 30 or 35, read from the data
+print(f"{args.data}: {X.shape[0]:,} examples from {n_markets:,} markets, {N_ASSETS} stocks")
 
-# the saved model is named after the data size, e.g. model_100k.joblib,
-# so a run can never be saved under the wrong name
-MODEL_FILE = DATA_DIR / f"model_{n_markets // 1000}k.joblib"
+# the saved model is named after the experiment (--tag), or the data size if no tag,
+# so an experiment can never overwrite the baseline model
+TAG = args.tag or f"{n_markets // 1000}k"
+MODEL_FILE = DATA_DIR / f"model_{TAG}.joblib"
 
 
 # ---------------------------------------------------------------- split
@@ -153,17 +164,7 @@ for lo, hi in zip(edges[:-1], edges[1:]):
         print(f"  {name:>12} {vals[sel].mean():>10.5f}")
 
 
-# ---------------------------------------------------------------- summary
-# one line to copy into the results table in PROGRESS.md
-print(f"\nSUMMARY  markets={n_markets:,}  alpha={ALPHA}  hidden={HIDDEN}  "
-      f"iters={model.n_iter_}  secs={train_seconds:.0f}  "
-      f"r2 train/test={r2_train:.3f}/{r2_test:.3f}  "
-      f"mse train/test={mse_train:.5f}/{mse_test:.5f}  "
-      f"model={losses['model'].mean() * 12:.2%}  "
-      f"even={losses['even split'].mean() * 12:.2%}  "
-      f"markowitz={losses['markowitz'].mean() * 12:.2%}")
-
-
+# ---------------------------------------------------------------- variance of performance
 # how much does the model's performance vary from one test history to the next?
 model_loss = losses["model"] * 12            # per year, one value per test history
 gap = losses["even split"] - losses["model"] # positive = model gave up less than even split
@@ -172,6 +173,20 @@ print(f"\nspread of the model's loss across {len(model_loss):,} test histories:"
 for q in [10, 50, 90]:
     print(f"  p{q}: {np.percentile(model_loss, q):.2%} per year")
 print(f"  model beats even split in {(gap > 0).mean():.1%} of test histories")
+
+
+# ---------------------------------------------------------------- summary
+# one line to copy into the results table in PROGRESS.md
+print(f"\nSUMMARY  data={args.data}  tag={TAG}  markets={n_markets:,}  stocks={N_ASSETS}  "
+      f"alpha={ALPHA}  hidden={HIDDEN}  iters={model.n_iter_}  secs={train_seconds:.0f}  "
+      f"r2 train/test={r2_train:.3f}/{r2_test:.3f}  "
+      f"mse train/test={mse_train:.5f}/{mse_test:.5f}  "
+      f"model={losses['model'].mean() * 12:.2%}  "
+      f"even={losses['even split'].mean() * 12:.2%}  "
+      f"markowitz={losses['markowitz'].mean() * 12:.2%}  "
+      f"win rate={(gap > 0).mean():.1%}")
+
+
 # ---------------------------------------------------------------- plot
 # bin by how extreme the perfect portfolio is, average the loss in each bin
 bins = np.array([1, 2, 3, 4, 6, 8, 12, 20, 1000])
@@ -199,7 +214,7 @@ ax.set_xscale("log"); ax.set_yscale("log")
 ax.set_xlabel("how extreme the perfect portfolio is (sum of absolute weights)",
               fontsize=12, color=MUTED, labelpad=9)
 ax.set_ylabel("return given up, per month", fontsize=12, color=MUTED, labelpad=9)
-ax.set_title("where the model struggles: loss by how extreme the market is",
+ax.set_title(f"where the model struggles: loss by how extreme the market is ({TAG})",
              fontsize=14.5, color=INK, fontweight="bold", loc="left", pad=16)
 ax.grid(color=GRID, lw=0.8, which="both"); ax.set_axisbelow(True)
 for s in ("top", "right"): ax.spines[s].set_visible(False)
@@ -208,5 +223,5 @@ ax.tick_params(colors=MUTED, labelsize=11)
 ax.legend(frameon=False, fontsize=11)
 
 fig.tight_layout()
-fig.savefig(FIG_DIR / f"loss_by_leverage_{n_markets // 1000}k.png", facecolor="white")
+fig.savefig(FIG_DIR / f"loss_by_leverage_{TAG}.png", facecolor="white")
 plt.show()   # last line: the script pauses here until you close the window
