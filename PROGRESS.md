@@ -534,3 +534,30 @@ Paper sentence: "Calibrating the simulator's volatility to real stocks reduced t
 drawdown on real data from -47% to -40%, but did not consistently improve its Sharpe ratio, because
 the leverage filter offset the calibration by retaining markets with more extreme optimal portfolios."
 Next: long-only oracle (removes the leverage filter), then error bars (5 seeds), histories, portfolio size.
+
+### Experiment 2 (histories per market), version A: same total rows
+Commands: python -m ml.dataset --markets 30000 --histories 10 --out train_h10.npz --no-crisis
+          python -m ml.train --data train_h10.npz --tag h10
+SUMMARY data=train_h10.npz tag=h10 markets=30,000 stocks=25 alpha=0.1 hidden=(128,64) iters=28 secs=17
+r2 train/test=0.272/0.228 mse train/test=0.01210/0.01260 model=3.39% even=5.09% markowitz=41.46% win rate=86.7%
+| | 100k x 3 (baseline) | 30k x 10 |
+|---|---|---|
+| rows / distinct markets | 300,000 / 100,000 | 300,000 / 30,000 |
+| model loss/yr | 3.39% | 3.39% |
+| even split | 5.08% | 5.09% |
+| win rate vs even | 86.7% | 86.7% |
+| loss spread p10/p50/p90 | 1.79/3.12/5.34% | 1.81/3.12/5.38% |
+| R2 train / test (gap) | 0.248 / 0.233 (0.015) | 0.272 / 0.228 (0.044) |
+| MSE train / test | 0.01253 / 0.01266 | 0.01210 / 0.01260 |
+Findings
+- Identical performance with 70% fewer distinct markets (prediction "3 histories wins" was wrong).
+- More histories per market -> a bit more fitting of training markets (gap 0.015 -> 0.044), no cost on test.
+- Consistent with data scaling (20k x 3 = 3.54%; 60k x 3 = 3.39%; 100k x 3 = 3.39%): above ~180k rows,
+  how the data is split between markets and histories doesn't matter; the limit is elsewhere
+  (model size, inputs, hidden alpha).
+Paper sentence: "Holding total training examples fixed at 300,000, trading market diversity for more
+histories per market (30,000 x 10 vs 100,000 x 3) left performance unchanged (3.39% CE loss, 86.7% win
+rate), though the train-test gap widened from 0.015 to 0.044."
+Still to run: 60k x 5 (python -m ml.dataset --markets 60000 --histories 5 --out train_h5.npz --no-crisis;
+python -m ml.train --data train_h5.npz --tag h5); version B overnight (100k x 10 = 1M rows, ~8 GB peak).
+Caveat: one seed each -> error bars still needed.
