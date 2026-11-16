@@ -1,0 +1,136 @@
+/Users/roganmgibbons/PycharmProjects/SeniorCompsV1/ml/train.py:227: UserWarning: FigureCanvasAgg is non-interactive, and thus cannot be shown
+  plt.show()   # last line: the script pauses here until you close the window
+train_100k_h5.npz: 500,000 examples from 100,000 markets, 25 stocks
+train: 400,000 rows   test: 100,000 rows
+Iteration 1, loss = 0.06962987
+Validation score: 0.003990
+Iteration 2, loss = 0.03352436
+Validation score: 0.062211
+Iteration 3, loss = 0.01788523
+Validation score: 0.152448
+Iteration 4, loss = 0.01577014
+Validation score: 0.210749
+Iteration 5, loss = 0.01655464
+Validation score: 0.226554
+Iteration 6, loss = 0.01701083
+Validation score: 0.227653
+Iteration 7, loss = 0.01720039
+Validation score: 0.233610
+Iteration 8, loss = 0.01730397
+Validation score: 0.230882
+Iteration 9, loss = 0.01736713
+Validation score: 0.233761
+Iteration 10, loss = 0.01749354
+Validation score: 0.237245
+Iteration 11, loss = 0.01766751
+Validation score: 0.233930
+Iteration 12, loss = 0.01777874
+Validation score: 0.234975
+Iteration 13, loss = 0.01780818
+Validation score: 0.234376
+Iteration 14, loss = 0.01781834
+Validation score: 0.233775
+Iteration 15, loss = 0.01784220
+Validation score: 0.233684
+Iteration 16, loss = 0.01784746
+Validation score: 0.238609
+Iteration 17, loss = 0.01785800
+Validation score: 0.239598
+Iteration 18, loss = 0.01785589
+Validation score: 0.233363
+Iteration 19, loss = 0.01786916
+Validation score: 0.238189
+Iteration 20, loss = 0.01789555
+Validation score: 0.238104
+Iteration 21, loss = 0.01789290
+Validation score: 0.237145
+Iteration 22, loss = 0.01791160
+Validation score: 0.239809
+Iteration 23, loss = 0.01790994
+Validation score: 0.240347
+Iteration 24, loss = 0.01793710
+Validation score: 0.240888
+Iteration 25, loss = 0.01793912
+Validation score: 0.235266
+Iteration 26, loss = 0.01794546
+Validation score: 0.240205
+Iteration 27, loss = 0.01794632
+Validation score: 0.239222
+Iteration 28, loss = 0.01793766
+Validation score: 0.237592
+Iteration 29, loss = 0.01795030
+Validation score: 0.238213
+Iteration 30, loss = 0.01795426
+Validation score: 0.235683
+Iteration 31, loss = 0.01795431
+Validation score: 0.233381
+Iteration 32, loss = 0.01795451
+Validation score: 0.241060
+Iteration 33, loss = 0.01795678
+Validation score: 0.235169
+Iteration 34, loss = 0.01794723
+Validation score: 0.238264
+Iteration 35, loss = 0.01795866
+Validation score: 0.234965
+Iteration 36, loss = 0.01797864
+Validation score: 0.233749
+Iteration 37, loss = 0.01798172
+Validation score: 0.238792
+Iteration 38, loss = 0.01796854
+Validation score: 0.240927
+Iteration 39, loss = 0.01797550
+Validation score: 0.237417
+Iteration 40, loss = 0.01797424
+Validation score: 0.240779
+Iteration 41, loss = 0.01795755
+Validation score: 0.238708
+Iteration 42, loss = 0.01792959
+Validation score: 0.238741
+Iteration 43, loss = 0.01791235
+Validation score: 0.230265
+Validation score did not improve more than tol=0.000100 for 10 consecutive epochs. Stopping.
+
+stopped after 43 iterations, 38 seconds
+
+             r2        mse
+ train   0.2468   0.012570
+  test   0.2350   0.012792
+
+saved model to /Users/roganmgibbons/PycharmProjects/SeniorCompsV1/data/model_100k_h5.joblib
+
+raw prediction sums:
+  min 0.9992  max 1.0030
+  median 1.0008
+  how many below 0.5: 0
+
+    strategy         mean       median  per year
+----------------------------------------------------
+       model      0.00283      0.00260    3.39%
+   markowitz      0.03443      0.01568   41.31%
+  even split      0.00426      0.00386    5.11%
+
+oracle gross leverage across test rows:
+  50th percentile:     2.09
+  75th percentile:     2.76
+  90th percentile:     3.40
+  95th percentile:     3.68
+  99th percentile:     3.93
+  100th percentile:     4.00
+
+oracle leverage 0 to 2   (45,170 rows)
+         model    0.00204
+     markowitz    0.03389
+    even split    0.00288
+
+oracle leverage 2 to 4   (54,830 rows)
+         model    0.00348
+     markowitz    0.03487
+    even split    0.00539
+
+spread of the model's loss across 100,000 test histories:
+  p10: 1.79% per year
+  p50: 3.12% per year
+  p90: 5.37% per year
+  model beats even split in 87.3% of test histories
+
+SUMMARY  data=train_100k_h5.npz  tag=100k_h5  markets=100,000  stocks=25  alpha=0.1  hidden=(128, 64)  iters=43  secs=38  r2 train/test=0.247/0.235  mse train/test=0.01257/0.01279  model=3.39%  even=5.11%  markowitz=41.31%  win rate=87.3%

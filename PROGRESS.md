@@ -561,3 +561,40 @@ rate), though the train-test gap widened from 0.015 to 0.044."
 Still to run: 60k x 5 (python -m ml.dataset --markets 60000 --histories 5 --out train_h5.npz --no-crisis;
 python -m ml.train --data train_h5.npz --tag h5); version B overnight (100k x 10 = 1M rows, ~8 GB peak).
 Caveat: one seed each -> error bars still needed.
+
+### Overnight chain (started Sun Nov 15, ~5:20pm): history depth
+Runs (each saves its own data + model; logs in real/results/log_<tag>.txt):
+1. 60,000 x 5   = 300k rows  -> train_h5.npz / model_h5        (completes same-total-rows comparison)
+2. 100,000 x 5  = 500k rows  -> train_100k_h5.npz / model_100k_h5
+3. 100,000 x 10 = 1M rows    -> train_100k_h10.npz / model_100k_h10 (~7-8 GB peak memory)
+Unattended tricks: caffeinate -i (no sleep), && (stop on failure), MPLBACKEND=Agg (plot window
+would otherwise block the chain; plots still saved), | tee (keep the printout).
+Sanity check on the 30k x 10 result matching the baseline (3.39%, 86.7%): it really is different data
+(markets=30,000; even split 5.09% vs 5.08%; 28 vs 38 iterations; different R2/MSE). Matching fits the
+plateau at ~3.4%; these runs add more points to confirm.
+
+### Experiment 2 (histories): overnight chain results (finished in ~15 min)
+Logs: real/results/log_h5.txt, log_100k_h5.txt, log_100k_h10.txt
+| Setup | Rows | Model | Even | Win rate | R2 train/test | Gap | iters | secs |
+|---|---|---|---|---|---|---|---|---|
+| 100k x 3 (baseline) | 300k | 3.39% | 5.08% | 86.7% | 0.248/0.233 | 0.015 | 38 | 21 |
+| 60k x 5   | 300k | 3.40% | 5.08% | 86.5% | 0.252/0.231 | 0.021 | 28 | 15 |
+| 30k x 10  | 300k | 3.39% | 5.09% | 86.7% | 0.272/0.228 | 0.044 | 28 | 17 |
+| 100k x 5  | 500k | 3.39% | 5.11% | 87.3% | 0.247/0.235 | 0.012 | 43 | 38 |
+| 100k x 10 | 1M   | 3.37% | 5.08% | 87.4% | 0.245/0.235 | 0.010 | 43 | 77 |
+Loss spread p10/p50/p90 nearly identical across all (~1.8% / 3.1% / 5.35%).
+Findings
+- Plateau confirmed: 300k -> 1M rows, any split, loss 3.37-3.40%. Tripling data: -0.02 pts.
+- Split (3/5/10 histories at 300k rows) doesn't matter: 3.39 / 3.40 / 3.39%.
+- Only memorizing changes: fewer distinct markets -> bigger train/test gap (0.044 at 30k markets,
+  0.010 at 100k x 10), with no cost on test.
+- Ruled out as the bottleneck: data size, regularization strength, histories per market.
+  Remaining levers: model capacity (bigger network: now justified, gap only 0.010 at 1M rows) and
+  inputs (formula weights as features); part of the gap is unreachable (Bayes floor ~2.7%).
+Paper sentence: "Performance plateaued at a CE loss of about 3.4%/yr across five training
+configurations from 300,000 to 1,000,000 examples (3-10 histories per market). Tripling the data
+improved loss by only 0.02 percentage points, indicating the model is limited by capacity or inputs
+rather than data."
+Disk: data/ now ~10 GB. train_h5, train_h10, train_100k_h5 can be deleted later (all regenerable).
+Next: bigger network on train_100k_h10.npz (add --hidden to train.py); long-only oracle; error bars;
+portfolio size 25/30/35.
