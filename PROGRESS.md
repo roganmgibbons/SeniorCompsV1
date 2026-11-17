@@ -598,3 +598,27 @@ rather than data."
 Disk: data/ now ~10 GB. train_h5, train_h10, train_100k_h5 can be deleted later (all regenerable).
 Next: bigger network on train_100k_h10.npz (add --hidden to train.py); long-only oracle; error bars;
 portfolio size 25/30/35.
+
+### Mon Nov 16, 2026: Experiment 4, network size (capacity) on train_100k_h10.npz (1M rows)
+Code: train.py gets --hidden (e.g. --hidden 256 128); default (128, 64) unchanged.
+Logs: real/results/log_big_256_128.txt, log_big_512_256.txt, log_big_256_128_64.txt
+(";" between runs so one failure doesn't stop the rest; "FigureCanvasAgg is non-interactive" warning
+is harmless, it just confirms the plot window was skipped.)
+| Network | Size | Model | R2 train/test | MSE train/test | Win rate | iters | secs |
+|---|---|---|---|---|---|---|---|
+| (128, 64) baseline | 1x | 3.37% | 0.245/0.235 | 0.01254/0.01262 | 87.4% | 43 | 77 |
+| (256, 128)         | ~2x wider | 3.35% | 0.251/0.240 | 0.01246/0.01254 | 87.7% | 27 | 89 |
+| (512, 256)         | ~6x wider | 3.34% | 0.257/0.243 | 0.01235/0.01249 | 88.1% | 22 | 156 |
+| (256, 128, 64)     | ~2x, deeper | 3.39% | 0.242/0.231 | 0.01259/0.01268 | 88.1% | 24 | 87 |
+Findings
+- Wider helps slightly with diminishing returns (-0.02, then -0.01); deeper does not help.
+- Train/test gap ~0.01 everywhere: no overfitting; just little more signal to find.
+- Four levers tested, none moves the model past ~3.35%: data (60k -> 1M rows), penalty (1e-3..1e-1),
+  histories (3..10), width (1x..6x). Limit is the information in the inputs (hidden alpha, Merton 1980).
+  Remaining untested lever: better inputs (formula weights as features).
+- Caveat: same penalty (0.1) for all sizes; a bigger net may want a lighter one -> optional quick
+  test: --hidden 512 256 --alpha 0.01.
+Paper sentence: "Increasing network width six-fold improved CE loss by only 0.03 percentage points
+(3.37% -> 3.34%), and adding depth did not help; together with the data and regularization
+experiments, this indicates the model operates near the limit of the information available in its
+inputs."

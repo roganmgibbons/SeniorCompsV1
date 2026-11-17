@@ -24,10 +24,12 @@ p = argparse.ArgumentParser()
 p.add_argument("--data", default="train.npz", help="which data file in data/ to train on")
 p.add_argument("--tag", default=None, help="name for the saved model, e.g. lowvol")
 p.add_argument("--alpha", type=float, default=1e-1)
+p.add_argument("--hidden", type=int, nargs="+", default=[128, 64],
+               help="neurons per layer, e.g. --hidden 256 128")
 args = p.parse_args()
 
 ALPHA = args.alpha         # L2 penalty against memorizing (not the market's alpha)
-HIDDEN = (128, 64)         # network size: two layers of 128 and 64 neurons
+HIDDEN = tuple(args.hidden) # network size: two layers of 128 and 64 neurons
 
 
 # ---------------------------------------------------------------- load

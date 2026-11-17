@@ -1,0 +1,98 @@
+/Users/roganmgibbons/PycharmProjects/SeniorCompsV1/ml/train.py:229: UserWarning: FigureCanvasAgg is non-interactive, and thus cannot be shown
+  plt.show()   # last line: the script pauses here until you close the window
+train_100k_h10.npz: 1,000,000 examples from 100,000 markets, 25 stocks
+train: 800,000 rows   test: 200,000 rows
+Iteration 1, loss = 0.06710500
+Validation score: 0.105890
+Iteration 2, loss = 0.02022465
+Validation score: 0.198453
+Iteration 3, loss = 0.02122868
+Validation score: 0.224369
+Iteration 4, loss = 0.02210082
+Validation score: 0.230298
+Iteration 5, loss = 0.02258560
+Validation score: 0.236557
+Iteration 6, loss = 0.02280869
+Validation score: 0.236612
+Iteration 7, loss = 0.02296215
+Validation score: 0.235927
+Iteration 8, loss = 0.02299377
+Validation score: 0.233098
+Iteration 9, loss = 0.02303177
+Validation score: 0.231241
+Iteration 10, loss = 0.02307846
+Validation score: 0.237559
+Iteration 11, loss = 0.02310054
+Validation score: 0.231004
+Iteration 12, loss = 0.02311762
+Validation score: 0.233803
+Iteration 13, loss = 0.02315119
+Validation score: 0.238983
+Iteration 14, loss = 0.02318520
+Validation score: 0.230613
+Iteration 15, loss = 0.02321197
+Validation score: 0.238856
+Iteration 16, loss = 0.02324438
+Validation score: 0.233654
+Iteration 17, loss = 0.02324763
+Validation score: 0.235657
+Iteration 18, loss = 0.02328963
+Validation score: 0.237510
+Iteration 19, loss = 0.02329863
+Validation score: 0.238169
+Iteration 20, loss = 0.02331184
+Validation score: 0.232935
+Iteration 21, loss = 0.02332838
+Validation score: 0.237634
+Iteration 22, loss = 0.02335531
+Validation score: 0.235805
+Iteration 23, loss = 0.02337276
+Validation score: 0.236841
+Iteration 24, loss = 0.02339773
+Validation score: 0.236304
+Validation score did not improve more than tol=0.000100 for 10 consecutive epochs. Stopping.
+
+stopped after 24 iterations, 87 seconds
+
+             r2        mse
+ train   0.2423   0.012592
+  test   0.2312   0.012684
+
+saved model to /Users/roganmgibbons/PycharmProjects/SeniorCompsV1/data/model_big_256_128_64.joblib
+
+raw prediction sums:
+  min 0.9995  max 1.0022
+  median 1.0006
+  how many below 0.5: 0
+
+    strategy         mean       median  per year
+----------------------------------------------------
+       model      0.00283      0.00261    3.39%
+   markowitz      0.03441      0.01575   41.30%
+  even split      0.00423      0.00385    5.08%
+
+oracle gross leverage across test rows:
+  50th percentile:     2.07
+  75th percentile:     2.75
+  90th percentile:     3.41
+  95th percentile:     3.69
+  99th percentile:     3.94
+  100th percentile:     4.00
+
+oracle leverage 0 to 2   (92,430 rows)
+         model    0.00202
+     markowitz    0.03396
+    even split    0.00287
+
+oracle leverage 2 to 4   (107,570 rows)
+         model    0.00352
+     markowitz    0.03481
+    even split    0.00540
+
+spread of the model's loss across 200,000 test histories:
+  p10: 1.78% per year
+  p50: 3.13% per year
+  p90: 5.38% per year
+  model beats even split in 88.1% of test histories
+
+SUMMARY  data=train_100k_h10.npz  tag=big_256_128_64  markets=100,000  stocks=25  alpha=0.1  hidden=(256, 128, 64)  iters=24  secs=87  r2 train/test=0.242/0.231  mse train/test=0.01259/0.01268  model=3.39%  even=5.08%  markowitz=41.30%  win rate=88.1%
