@@ -622,3 +622,30 @@ Paper sentence: "Increasing network width six-fold improved CE loss by only 0.03
 (3.37% -> 3.34%), and adding depth did not help; together with the data and regularization
 experiments, this indicates the model operates near the limit of the information available in its
 inputs."
+
+### Real-data test of the big model (512, 256): python -m real.experiments --model model_big_512_256.joblib
+Full output: real/results/experiments_big_512_256_2026-11-16.txt. Formula rows identical (sanity ok).
+10-yr lookback, Jan 2002 - Oct 2026:
+| | Original (128,64) | Low-vol | Big (512,256) | Even split |
+|---|---|---|---|---|
+| model Sharpe | 0.61 | 0.58 | 0.67 | 0.90 |
+| model worst drop | -47% | -40% | -41% | -45% |
+| model vol | 15.2% | 14.8% | 13.8% | 15.2% |
+| model leverage | 1.55 | 1.44 | 1.33 | 1.00 |
+| model $1 -> | 7.27 | 6.42 | 7.79 | 22.33 |
+| model LO Sharpe | 0.78 | 0.74 | 0.78 | |
+| model LO worst drop | -47% | -41% | -42% | |
+Lookbacks, Sharpe model / LO: 5-yr: 0.61/0.87 | 0.85/0.98 | 0.69/0.89 (even 0.96);
+20-yr: 0.96/1.06 | 0.85/0.96 | 0.86/0.97 (even 1.14).
+Findings
+- Big network = best unconstrained model at 10-yr (Sharpe 0.67, lowest vol/leverage, smaller crash):
+  more cautious. Long-only unchanged (0.78): no-shorting is already cautious.
+- No variant wins at every lookback (big best at 10-yr, low-vol at 5-yr, original at 20-yr).
+- Across 3 model variants real Sharpe stays in 0.58-0.67 (LO 0.74-0.78) vs 0.90 for 1/N: model
+  differences (~+/-0.05) << gap to 1/N (>= 0.12). Training changes don't close the gap; the cause is
+  simulator vs reality (survivorship alphas +5%, ~40% higher simulated volatility, one-factor structure).
+Paper sentence: "Across three model variants (baseline, realistic-volatility, and a 6x wider network),
+real-data Sharpe varied only between 0.58 and 0.67 (0.74-0.78 long-only), while equal weighting achieved
+0.90. Model changes did not close the gap; the evidence points instead to differences between the
+simulator and real markets: survivorship-driven positive alphas, higher simulated volatility, and a
+one-factor structure."
